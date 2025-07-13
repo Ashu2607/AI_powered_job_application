@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 import Select from 'react-select';
@@ -8,18 +8,22 @@ const RecruiterForm = () => {
   const [jobEntries, setJobEntries] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
-  const [accessRequested, setAccessRequested] = useState(false); // Track access request
+  const [accessRequested, setAccessRequested] = useState(false);
+  const [token, setToken] = useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
+    const storedToken = localStorage.getItem('authToken');
     const role = localStorage.getItem('role');
 
-    if (!token || role !== "recruiter") {
+    if (!storedToken || role !== "recruiter") {
       navigate('/login?role=recruiter');
+      return;
     }
 
-    // Load job titles and descriptions
+    setToken(storedToken);
+
     fetch('/job_description_2.csv')
       .then(res => res.text())
       .then(csv => {
@@ -43,7 +47,6 @@ const RecruiterForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const token = localStorage.getItem('authToken');
     if (!token) {
       alert('You must be logged in to post a job.');
       navigate('/login?role=recruiter');
@@ -54,7 +57,7 @@ const RecruiterForm = () => {
       title: selectedJob.value,
       description: jobDescription,
       company: companyName,
-      access_requested: accessRequested, // Include access requested flag
+      access_requested: accessRequested,
     };
 
     try {
@@ -67,11 +70,16 @@ const RecruiterForm = () => {
         body: JSON.stringify({ jobs: [job] }),
       });
 
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Error posting job');
+      }
+
       const result = await res.json();
       alert(result.message || "Job posted successfully!");
     } catch (error) {
       console.error("Failed to post job:", error);
-      alert("Error posting job.");
+      alert("Error posting job: " + error.message);
     }
   };
 
@@ -81,8 +89,8 @@ const RecruiterForm = () => {
   }));
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center text-white px-4">
-      <form onSubmit={handleSubmit} className="bg-gray-900 p-8 rounded shadow-md w-full max-w-2xl space-y-6">
+    <div className="min-h-screen bg-black text-white px-4 py-10">
+      <form onSubmit={handleSubmit} className="bg-gray-900 p-8 rounded shadow-md w-full max-w-2xl mx-auto space-y-6">
         <h2 className="text-3xl font-bold text-center">Post Job Opening</h2>
 
         <div>
@@ -121,7 +129,7 @@ const RecruiterForm = () => {
           <input
             type="checkbox"
             checked={accessRequested}
-            onChange={() => setAccessRequested(!accessRequested)} // Toggle access requested flag
+            onChange={() => setAccessRequested(!accessRequested)}
             className="w-4 h-4 text-green-500"
           />
           <label className="text-sm">Request Access for Job Posting</label>
@@ -134,6 +142,55 @@ const RecruiterForm = () => {
           Post Job
         </button>
       </form>
+
+      <div className="max-w-5xl mx-auto mt-12">
+        {token && <MyJobsComponent token={token} />}
+      </div>
+    </div>
+  );
+};
+
+const MyJobsComponent = ({ token }) => {
+  const [myJobs, setMyJobs] = useState([]);
+
+  const fetchMyJobs = useCallback(async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/jobs/my", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      console.log("Fetched jobs after refresh:", data);
+      setMyJobs(data.jobs || []);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchMyJobs();
+    }
+  }, [token, fetchMyJobs]); // ✅ No ESLint warning now
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-4">My Job Postings</h2>
+      {myJobs.length === 0 ? (
+        <p className="text-gray-400">You haven't posted any jobs yet.</p>
+      ) : (
+        <div className="space-y-4">
+          {myJobs.map((job, idx) => (
+            <div key={idx} className="bg-gray-800 p-5 rounded border border-gray-700">
+              <h3 className="text-xl font-semibold">{job.title}</h3>
+              <p className="text-sm text-gray-400 mb-2">Company: {job.company}</p>
+              <p className="text-sm text-gray-400 mb-2">Access Requested: {job.access_requested ? "Yes" : "No"}</p>
+              <p className="whitespace-pre-wrap text-white">{job.description}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
