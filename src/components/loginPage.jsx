@@ -1,4 +1,3 @@
-// src/components/LoginPage.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,19 +6,31 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    const user = users[email];
+    try {
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!user) {
-      alert('User not found!');
-    } else if (user.password !== password) {
-      alert('Incorrect password!');
-    } else {
-      localStorage.setItem('authToken', email); // Store email as token (for demo)
-      
+      if (!response.ok) {
+        const { message } = await response.json();
+        throw new Error(message || 'Login failed');
+      }
+
+      const data = await response.json();
+      const { token, user } = data;
+
+      // Save token and user info in localStorage
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('role', user.role);
+
       // Redirect based on role
       if (user.role === 'recruiter') {
         navigate('/recruiter-form');
@@ -28,6 +39,8 @@ function LoginPage() {
       } else {
         alert('User role not recognized.');
       }
+    } catch (error) {
+      alert(error.message);
     }
   };
 
