@@ -14,8 +14,9 @@ http.createServer(app).listen(5000, () => {
 
 // Routes
 const jobRoutes = require("./routes/jobs_bulk");
-const authRoutes = require("./routes/auth"); // ✅ Import auth routes
-
+const authRoutes = require("./routes/auth");
+const recruiterRoutes = require("./routes/recruiter");// ✅ Import auth routes
+const studentRoutes= require("./routes/student"); // ✅ Import student routes
 // App Setup
 app.use(cors());
 app.use(express.json());
@@ -30,7 +31,9 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api", authRoutes);  // ✅ Register /api/signup, /api/login
-app.use("/api", jobRoutes);   // ✅ Register /api/jobs, etc.
+app.use("/api", jobRoutes);
+app.use("/api", recruiterRoutes);   // ✅ Register /api/jobs, etc.
+app.use("/api", studentRoutes);
 
 // Database & Server Initialization
 const PORT = process.env.PORT || 5000;
