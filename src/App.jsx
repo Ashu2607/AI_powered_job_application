@@ -37,6 +37,15 @@ function App() {
             : <Navigate to="/login" />
         }
       />
+
+      <Route
+        path="/student-form"
+        element={
+          localStorage.getItem("authToken") && localStorage.getItem("role") === "student"
+            ? <StudentForm />
+            : <Navigate to="/login" />
+        }
+      />
       {/* <Route
         path="/recruiter"
         element={
